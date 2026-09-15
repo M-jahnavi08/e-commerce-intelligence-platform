@@ -1,0 +1,714 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Commerce application tier; existing private data services required",
+  "Parameters": {
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "PrivateSubnets": {
+      "Type": "List<AWS::EC2::Subnet::Id>"
+    },
+    "LoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "TargetGroupArn": {
+      "Type": "String"
+    },
+    "RuntimeSecretArn": {
+      "Type": "String"
+    },
+    "RedisHost": {
+      "Type": "String"
+    },
+    "KafkaBootstrapServers": {
+      "Type": "String"
+    },
+    "PublicOrigin": {
+      "Type": "String",
+      "AllowedPattern": "https://.+"
+    },
+    "ImageTag": {
+      "Type": "String",
+      "Default": "initial"
+    },
+    "DesiredCount": {
+      "Type": "Number",
+      "Default": 0,
+      "MinValue": 0,
+      "MaxValue": 10
+    },
+    "KafkaSecurityProtocol": {
+      "Type": "String",
+      "Default": "SASL_SSL",
+      "AllowedValues": [
+        "SASL_SSL",
+        "SSL"
+      ]
+    },
+    "KafkaSaslMechanism": {
+      "Type": "String",
+      "Default": "SCRAM-SHA-512",
+      "AllowedValues": [
+        "SCRAM-SHA-512",
+        "SCRAM-SHA-256"
+      ]
+    },
+    "BootstrapAdmin": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "Description": "Temporarily read ADMIN_EMAIL and ADMIN_PASSWORD from the runtime secret on first deployment."
+    }
+  },
+  "Resources": {
+    "Cluster": {
+      "Type": "AWS::ECS::Cluster",
+      "Properties": {
+        "ClusterSettings": [
+          {
+            "Name": "containerInsights",
+            "Value": "enabled"
+          }
+        ]
+      }
+    },
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 30
+      }
+    },
+    "TaskSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Commerce ingress from HTTPS ALB only",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 8080,
+            "ToPort": 8080,
+            "SourceSecurityGroupId": {
+              "Ref": "LoadBalancerSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "ExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "runtime-secret",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue"
+                  ],
+                  "Resource": {
+                    "Ref": "RuntimeSecretArn"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "TaskRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      }
+    },
+    "BackendRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        }
+      }
+    },
+    "FrontendRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        }
+      }
+    },
+    "MlRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        }
+      }
+    },
+    "Task": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "RequiresCompatibilities": [
+          "FARGATE"
+        ],
+        "NetworkMode": "awsvpc",
+        "Cpu": "2048",
+        "Memory": "4096",
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": [
+            "ExecutionRole",
+            "Arn"
+          ]
+        },
+        "TaskRoleArn": {
+          "Fn::GetAtt": [
+            "TaskRole",
+            "Arn"
+          ]
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": "frontend",
+            "Image": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Fn::GetAtt": [
+                      "FrontendRepository",
+                      "RepositoryUri"
+                    ]
+                  },
+                  ":",
+                  {
+                    "Ref": "ImageTag"
+                  }
+                ]
+              ]
+            },
+            "Essential": true,
+            "Cpu": 256,
+            "Memory": 256,
+            "PortMappings": [
+              {
+                "ContainerPort": 8080
+              }
+            ],
+            "Environment": [
+              {
+                "Name": "BACKEND_UPSTREAM",
+                "Value": "http://127.0.0.1:8081"
+              }
+            ],
+            "Secrets": [],
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "Logs"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "frontend"
+              }
+            },
+            "HealthCheck": {
+              "Command": [
+                "CMD-SHELL",
+                "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"
+              ],
+              "Interval": 30,
+              "Timeout": 5,
+              "Retries": 3,
+              "StartPeriod": 30
+            },
+            "DependsOn": [
+              {
+                "ContainerName": "backend",
+                "Condition": "HEALTHY"
+              }
+            ]
+          },
+          {
+            "Name": "backend",
+            "Image": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Fn::GetAtt": [
+                      "BackendRepository",
+                      "RepositoryUri"
+                    ]
+                  },
+                  ":",
+                  {
+                    "Ref": "ImageTag"
+                  }
+                ]
+              ]
+            },
+            "Essential": true,
+            "Cpu": 1024,
+            "Memory": 2048,
+            "PortMappings": [
+              {
+                "ContainerPort": 8081
+              }
+            ],
+            "Environment": [
+              {
+                "Name": "SERVER_PORT",
+                "Value": "8081"
+              },
+              {
+                "Name": "ML_URL",
+                "Value": "http://127.0.0.1:8000"
+              },
+              {
+                "Name": "REDIS_HOST",
+                "Value": {
+                  "Ref": "RedisHost"
+                }
+              },
+              {
+                "Name": "SPRING_DATA_REDIS_SSL_ENABLED",
+                "Value": "true"
+              },
+              {
+                "Name": "CACHE_ENABLED",
+                "Value": "true"
+              },
+              {
+                "Name": "EVENTS_ENABLED",
+                "Value": "true"
+              },
+              {
+                "Name": "KAFKA_BOOTSTRAP_SERVERS",
+                "Value": {
+                  "Ref": "KafkaBootstrapServers"
+                }
+              },
+              {
+                "Name": "SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL",
+                "Value": {
+                  "Ref": "KafkaSecurityProtocol"
+                }
+              },
+              {
+                "Name": "CORS_ORIGIN",
+                "Value": {
+                  "Ref": "PublicOrigin"
+                }
+              },
+              {
+                "Name": "APP_KAFKA_REPLICAS",
+                "Value": "3"
+              },
+              {
+                "Name": "SPRING_KAFKA_PROPERTIES_SASL_MECHANISM",
+                "Value": {
+                  "Ref": "KafkaSaslMechanism"
+                }
+              }
+            ],
+            "Secrets": [
+              {
+                "Name": "DATABASE_URL",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:DATABASE_URL::"
+                }
+              },
+              {
+                "Name": "DATABASE_USER",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:DATABASE_USER::"
+                }
+              },
+              {
+                "Name": "DATABASE_PASSWORD",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:DATABASE_PASSWORD::"
+                }
+              },
+              {
+                "Name": "JWT_SECRET",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:JWT_SECRET::"
+                }
+              },
+              {
+                "Name": "ML_SERVICE_TOKEN",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:ML_SERVICE_TOKEN::"
+                }
+              },
+              {
+                "Fn::If": [
+                  "UseKafkaSasl",
+                  {
+                    "Name": "SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG",
+                    "ValueFrom": {
+                      "Fn::Sub": "${RuntimeSecretArn}:KAFKA_SASL_JAAS_CONFIG::"
+                    }
+                  },
+                  {
+                    "Ref": "AWS::NoValue"
+                  }
+                ]
+              },
+              {
+                "Name": "SPRING_DATA_REDIS_PASSWORD",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:REDIS_PASSWORD::"
+                }
+              },
+              {
+                "Fn::If": [
+                  "BootstrapAdminEnabled",
+                  {
+                    "Name": "ADMIN_EMAIL",
+                    "ValueFrom": {
+                      "Fn::Sub": "${RuntimeSecretArn}:ADMIN_EMAIL::"
+                    }
+                  },
+                  {
+                    "Ref": "AWS::NoValue"
+                  }
+                ]
+              },
+              {
+                "Fn::If": [
+                  "BootstrapAdminEnabled",
+                  {
+                    "Name": "ADMIN_PASSWORD",
+                    "ValueFrom": {
+                      "Fn::Sub": "${RuntimeSecretArn}:ADMIN_PASSWORD::"
+                    }
+                  },
+                  {
+                    "Ref": "AWS::NoValue"
+                  }
+                ]
+              }
+            ],
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "Logs"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "backend"
+              }
+            },
+            "HealthCheck": {
+              "Command": [
+                "CMD-SHELL",
+                "wget -q -O /dev/null http://127.0.0.1:8081/actuator/health/readiness || exit 1"
+              ],
+              "Interval": 30,
+              "Timeout": 5,
+              "Retries": 3,
+              "StartPeriod": 120
+            },
+            "DependsOn": [
+              {
+                "ContainerName": "ml",
+                "Condition": "HEALTHY"
+              }
+            ]
+          },
+          {
+            "Name": "ml",
+            "Image": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Fn::GetAtt": [
+                      "MlRepository",
+                      "RepositoryUri"
+                    ]
+                  },
+                  ":",
+                  {
+                    "Ref": "ImageTag"
+                  }
+                ]
+              ]
+            },
+            "Essential": true,
+            "Cpu": 768,
+            "Memory": 1792,
+            "PortMappings": [
+              {
+                "ContainerPort": 8000
+              }
+            ],
+            "Environment": [],
+            "Secrets": [
+              {
+                "Name": "ML_SERVICE_TOKEN",
+                "ValueFrom": {
+                  "Fn::Sub": "${RuntimeSecretArn}:ML_SERVICE_TOKEN::"
+                }
+              }
+            ],
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "Logs"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "ml"
+              }
+            },
+            "HealthCheck": {
+              "Command": [
+                "CMD-SHELL",
+                "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""
+              ],
+              "Interval": 30,
+              "Timeout": 5,
+              "Retries": 3,
+              "StartPeriod": 30
+            }
+          }
+        ]
+      }
+    },
+    "Service": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "Cluster": {
+          "Ref": "Cluster"
+        },
+        "TaskDefinition": {
+          "Ref": "Task"
+        },
+        "DesiredCount": {
+          "Ref": "DesiredCount"
+        },
+        "LaunchType": "FARGATE",
+        "HealthCheckGracePeriodSeconds": 180,
+        "DeploymentConfiguration": {
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true
+          }
+        },
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "DISABLED",
+            "Subnets": {
+              "Ref": "PrivateSubnets"
+            },
+            "SecurityGroups": [
+              {
+                "Ref": "TaskSecurityGroup"
+              }
+            ]
+          }
+        },
+        "LoadBalancers": [
+          {
+            "ContainerName": "frontend",
+            "ContainerPort": 8080,
+            "TargetGroupArn": {
+              "Ref": "TargetGroupArn"
+            }
+          }
+        ]
+      }
+    },
+    "CpuAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "AWS/ECS",
+        "MetricName": "CPUUtilization",
+        "Dimensions": [
+          {
+            "Name": "ClusterName",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Name": "ServiceName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Service",
+                "Name"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Average",
+        "Period": 60,
+        "EvaluationPeriods": 5,
+        "Threshold": 85,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching"
+      }
+    },
+    "MemoryAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "AWS/ECS",
+        "MetricName": "MemoryUtilization",
+        "Dimensions": [
+          {
+            "Name": "ClusterName",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Name": "ServiceName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Service",
+                "Name"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Average",
+        "Period": 60,
+        "EvaluationPeriods": 5,
+        "Threshold": 85,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching"
+      }
+    }
+  },
+  "Outputs": {
+    "BackendImageRepository": {
+      "Value": {
+        "Fn::GetAtt": [
+          "BackendRepository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "FrontendImageRepository": {
+      "Value": {
+        "Fn::GetAtt": [
+          "FrontendRepository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "MlImageRepository": {
+      "Value": {
+        "Fn::GetAtt": [
+          "MlRepository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "ClusterName": {
+      "Value": {
+        "Ref": "Cluster"
+      }
+    },
+    "ServiceName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Service",
+          "Name"
+        ]
+      }
+    },
+    "TaskSecurityGroupId": {
+      "Value": {
+        "Ref": "TaskSecurityGroup"
+      }
+    },
+    "TaskDefinitionArn": {
+      "Value": {
+        "Ref": "Task"
+      }
+    }
+  },
+  "Conditions": {
+    "UseKafkaSasl": {
+      "Fn::Equals": [
+        {
+          "Ref": "KafkaSecurityProtocol"
+        },
+        "SASL_SSL"
+      ]
+    },
+    "BootstrapAdminEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "BootstrapAdmin"
+        },
+        "true"
+      ]
+    }
+  }
+}

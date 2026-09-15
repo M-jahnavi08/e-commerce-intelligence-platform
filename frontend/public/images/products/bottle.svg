@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="440" viewBox="0 0 600 440"><defs>
+ <linearGradient id="dark" x2="1" y2="1"><stop stop-color="#51676b"/><stop offset="1" stop-color="#172c32"/></linearGradient>
+ <linearGradient id="cream" x2=".4" y2="1"><stop stop-color="#fffdf7"/><stop offset="1" stop-color="#d8d8ca"/></linearGradient>
+ <linearGradient id="green" x2="1" y2=".4"><stop stop-color="#91a184"/><stop offset="1" stop-color="#405e51"/></linearGradient>
+ <linearGradient id="metal" x2=".4" y2="1"><stop stop-color="#e4e9e9"/><stop offset=".5" stop-color="#acbabe"/><stop offset="1" stop-color="#81969d"/></linearGradient>
+ <linearGradient id="tan" x2="1" y2="1"><stop stop-color="#ca9a70"/><stop offset="1" stop-color="#966440"/></linearGradient>
+ <linearGradient id="clay" x2="1"><stop stop-color="#d8b28c"/><stop offset="1" stop-color="#a27759"/></linearGradient>
+ <linearGradient id="wood" x2="1" y2="1"><stop stop-color="#e3c290"/><stop offset="1" stop-color="#b18554"/></linearGradient>
+ <pattern id="mesh" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#354e52"/><circle cx="3" cy="3" r="1.2" fill="#8da0a1"/></pattern>
+ <pattern id="woven" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#ded0b4"/><path d="M0 2h6M2 0v6" stroke="#cabb9e" stroke-width="1"/></pattern>
+ <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+ <rect width="600" height="440" fill="#dce8e3"/><circle cx="465" cy="73" r="195" fill="#ffffff" opacity=".18"/>
+ <ellipse cx="303" cy="350" rx="129" ry="16" fill="#293f3e" opacity=".15" filter="url(#shadow)"/>
+ <rect x="254" y="117" width="94" height="218" rx="34" fill="url(#green)"/><path d="M260 153v136" stroke="#c3d1ba" stroke-width="5" opacity=".35"/><rect x="263" y="80" width="76" height="55" rx="15" fill="#314b46"/><path d="M278 83V69c0-27 46-27 46 0v14" fill="none" stroke="#314b46" stroke-width="9"/><path d="M267 129h68" stroke="#a2b6a0" stroke-width="3"/><path d="M286 251h29" stroke="#cedac8" stroke-width="3"/><path d="M300 217c-17 20-20 30 0 30s17-11 0-30" fill="#dce5d4" opacity=".7"/><text x="300" y="398" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" letter-spacing="3" fill="#5f716d">HYDRATE / EVERYDAY</text></svg>

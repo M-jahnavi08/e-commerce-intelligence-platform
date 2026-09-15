@@ -1,0 +1,43 @@
+name: Release verified commerce images
+on:
+  workflow_dispatch:
+    inputs:
+      stack_name:
+        description: Existing CloudFormation application stack
+        required: true
+        type: string
+      desired_count:
+        description: Fargate task count
+        required: true
+        default: '2'
+        type: choice
+        options: ['1', '2', '3', '4']
+permissions:
+  contents: read
+concurrency:
+  group: commerce-production-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build, push and update existing stack
+        env:
+          AWS_CLOUDFORMATION_ROLE_ARN: ${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}
+          COMMERCE_STACK: ${{ inputs.stack_name }}
+          COMMERCE_COUNT: ${{ inputs.desired_count }}
+          COMMERCE_IMAGE_TAG: ${{ github.sha }}
+        run: python scripts/release-aws.py

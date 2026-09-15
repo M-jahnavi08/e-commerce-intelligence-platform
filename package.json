@@ -1,0 +1,12 @@
+{
+  "name": "commerce-intelligence-tooling",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write \"frontend/src/**/*.{ts,tsx,css}\" \"frontend/*.{json,ts,html}\" \"backend/src/**/*.java\" \"backend/src/**/*.yml\" \"docs/*.md\" \"infra/aws/*.{md,json}\" \".github/workflows/*.yml\" \"*.{json,yml,md}\"",
+    "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx,css}\" \"frontend/*.{json,ts,html}\" \"backend/src/**/*.java\" \"backend/src/**/*.yml\" \"docs/*.md\" \"infra/aws/*.{md,json}\" \".github/workflows/*.yml\" \"*.{json,yml,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prettier-plugin-java": "^2.7.5"
+  }
+}

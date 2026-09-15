@@ -1,0 +1,17 @@
+node_modules
+dist
+target
+.venv
+__pycache__
+.pytest_cache
+.env
+coverage
+
+.env.*
+.git
+*.log
+*.key
+*.p12
+*.pfx
+*.jks
+client.properties

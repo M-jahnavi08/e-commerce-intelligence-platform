@@ -1,0 +1,336 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Private managed PostgreSQL, Redis and authenticated Kafka for Commerce. Creates billable resources only when explicitly deployed.",
+  "Parameters": {
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "PrivateSubnets": {
+      "Type": "List<AWS::EC2::Subnet::Id>",
+      "Description": "Three private subnets in distinct Availability Zones"
+    },
+    "ApplicationSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "KafkaClusterName": {
+      "Type": "String",
+      "MaxLength": 64,
+      "Default": "commerce-intelligence"
+    },
+    "DatabaseInstanceClass": {
+      "Type": "String",
+      "Default": "db.t4g.micro"
+    },
+    "RedisNodeType": {
+      "Type": "String",
+      "Default": "cache.t4g.micro"
+    },
+    "PostgresEngineVersion": {
+      "Type": "String",
+      "AllowedPattern": "17\\.[0-9]+",
+      "Description": "Available PostgreSQL 17 minor version in the target region (query describe-db-engine-versions)."
+    }
+  },
+  "Resources": {
+    "DataSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Private data access from Commerce tasks only",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 5432,
+            "ToPort": 5432,
+            "SourceSecurityGroupId": {
+              "Ref": "ApplicationSecurityGroup"
+            }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 6379,
+            "ToPort": 6379,
+            "SourceSecurityGroupId": {
+              "Ref": "ApplicationSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "DatabaseSubnets": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "Commerce private database subnets",
+        "SubnetIds": {
+          "Ref": "PrivateSubnets"
+        }
+      }
+    },
+    "Database": {
+      "Type": "AWS::RDS::DBInstance",
+      "DeletionPolicy": "Snapshot",
+      "UpdateReplacePolicy": "Snapshot",
+      "Properties": {
+        "Engine": "postgres",
+        "EngineVersion": {
+          "Ref": "PostgresEngineVersion"
+        },
+        "DBInstanceClass": {
+          "Ref": "DatabaseInstanceClass"
+        },
+        "AllocatedStorage": "20",
+        "MaxAllocatedStorage": 100,
+        "StorageType": "gp3",
+        "StorageEncrypted": true,
+        "DBName": "commerce",
+        "MasterUsername": "commerce",
+        "ManageMasterUserPassword": true,
+        "DBSubnetGroupName": {
+          "Ref": "DatabaseSubnets"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "DataSecurityGroup"
+          }
+        ],
+        "PubliclyAccessible": false,
+        "MultiAZ": true,
+        "BackupRetentionPeriod": 7,
+        "DeletionProtection": true,
+        "AutoMinorVersionUpgrade": true,
+        "EnableCloudwatchLogsExports": [
+          "postgresql"
+        ]
+      }
+    },
+    "RedisSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "GenerateSecretString": {
+          "PasswordLength": 48,
+          "ExcludePunctuation": true
+        }
+      }
+    },
+    "RedisSubnets": {
+      "Type": "AWS::ElastiCache::SubnetGroup",
+      "Properties": {
+        "Description": "Commerce private Redis subnets",
+        "SubnetIds": {
+          "Ref": "PrivateSubnets"
+        }
+      }
+    },
+    "Redis": {
+      "Type": "AWS::ElastiCache::ReplicationGroup",
+      "DeletionPolicy": "Snapshot",
+      "UpdateReplacePolicy": "Snapshot",
+      "Properties": {
+        "ReplicationGroupDescription": "Commerce metadata cache",
+        "Engine": "redis",
+        "EngineVersion": "7.1",
+        "CacheNodeType": {
+          "Ref": "RedisNodeType"
+        },
+        "NumCacheClusters": 2,
+        "AutomaticFailoverEnabled": true,
+        "MultiAZEnabled": true,
+        "AtRestEncryptionEnabled": true,
+        "TransitEncryptionEnabled": true,
+        "AuthToken": {
+          "Fn::Sub": "{{resolve:secretsmanager:${RedisSecret}:SecretString}}"
+        },
+        "CacheSubnetGroupName": {
+          "Ref": "RedisSubnets"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "DataSecurityGroup"
+          }
+        ],
+        "SnapshotRetentionLimit": 3
+      }
+    },
+    "KafkaKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "KafkaSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "AmazonMSK_${KafkaClusterName}"
+        },
+        "KmsKeyId": {
+          "Ref": "KafkaKey"
+        },
+        "GenerateSecretString": {
+          "SecretStringTemplate": "{\"username\":\"commerce\"}",
+          "GenerateStringKey": "password",
+          "PasswordLength": 48,
+          "ExcludePunctuation": true
+        }
+      }
+    },
+    "Kafka": {
+      "Type": "AWS::MSK::Cluster",
+      "Properties": {
+        "ClusterName": {
+          "Ref": "KafkaClusterName"
+        },
+        "KafkaVersion": "3.9.x",
+        "NumberOfBrokerNodes": 3,
+        "BrokerNodeGroupInfo": {
+          "InstanceType": "kafka.t3.small",
+          "ClientSubnets": {
+            "Ref": "PrivateSubnets"
+          },
+          "SecurityGroups": [
+            {
+              "Ref": "KafkaSecurityGroup"
+            }
+          ],
+          "StorageInfo": {
+            "EBSStorageInfo": {
+              "VolumeSize": 100
+            }
+          }
+        },
+        "ClientAuthentication": {
+          "Sasl": {
+            "Scram": {
+              "Enabled": true
+            }
+          },
+          "Unauthenticated": {
+            "Enabled": false
+          }
+        },
+        "EncryptionInfo": {
+          "EncryptionAtRest": {
+            "DataVolumeKMSKeyId": {
+              "Fn::GetAtt": [
+                "KafkaKey",
+                "Arn"
+              ]
+            }
+          },
+          "EncryptionInTransit": {
+            "ClientBroker": "TLS",
+            "InCluster": true
+          }
+        }
+      }
+    },
+    "KafkaCredentials": {
+      "Type": "AWS::MSK::BatchScramSecret",
+      "Properties": {
+        "ClusterArn": {
+          "Ref": "Kafka"
+        },
+        "SecretArnList": [
+          {
+            "Ref": "KafkaSecret"
+          }
+        ]
+      }
+    },
+    "KafkaSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "SCRAM clients from Commerce and private inter-broker traffic",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 9096,
+            "ToPort": 9096,
+            "SourceSecurityGroupId": {
+              "Ref": "ApplicationSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "KafkaInternalIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "KafkaSecurityGroup"
+        },
+        "IpProtocol": "-1",
+        "SourceSecurityGroupId": {
+          "Ref": "KafkaSecurityGroup"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "DatabaseHost": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "Endpoint.Address"
+        ]
+      }
+    },
+    "DatabaseSecretArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "MasterUserSecret.SecretArn"
+        ]
+      }
+    },
+    "RedisHost": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Redis",
+          "PrimaryEndPoint.Address"
+        ]
+      }
+    },
+    "RedisSecretArn": {
+      "Value": {
+        "Ref": "RedisSecret"
+      }
+    },
+    "KafkaClusterArn": {
+      "Value": {
+        "Ref": "Kafka"
+      }
+    },
+    "KafkaSecretArn": {
+      "Value": {
+        "Ref": "KafkaSecret"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+work/
+outputs/
+**/node_modules/
+**/target/
+**/dist/
+**/.venv/
+**/package-lock.json
+**/tsconfig.tsbuildinfo
+**/.pytest_cache/
+**/__pycache__/

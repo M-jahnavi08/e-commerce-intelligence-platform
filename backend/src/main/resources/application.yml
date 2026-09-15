@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: commerce-intelligence
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/commerce}
+    username: ${DATABASE_USER:commerce}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+    consumer:
+      group-id: commerce-projections
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+server:
+  error:
+    include-message: never
+  shutdown: graceful
+management:
+  health:
+    redis:
+      enabled: ${CACHE_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
+app:
+  jwt-secret: ${JWT_SECRET}
+  cors-origin: ${CORS_ORIGIN:http://localhost:5173}
+  events-enabled: ${EVENTS_ENABLED:false}
+  cache-enabled: ${CACHE_ENABLED:false}
+  ml-url: ${ML_URL:http://localhost:8000}
+  ml-token: ${ML_SERVICE_TOKEN}
+  bootstrap-admin-email: ${ADMIN_EMAIL:}
+  bootstrap-admin-password: ${ADMIN_PASSWORD:}
+
+logging:
+  pattern:
+    level: '%5p [requestId:%X{requestId:-}]'
