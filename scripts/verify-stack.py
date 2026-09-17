@@ -109,8 +109,8 @@ def main():
 
     if args.compose:
         api('GET', '/categories')
-        assert compose('redis', 'redis-cli', 'EXISTS', 'catalog:categories:v1') == '1'
-        assert 0 < int(compose('redis', 'redis-cli', 'TTL', 'catalog:categories:v1')) <= 60
+        assert compose('redis', 'redis-cli', 'EXISTS', 'catalog:categories:v2') == '1'
+        assert 0 < int(compose('redis', 'redis-cli', 'TTL', 'catalog:categories:v2')) <= 60
         order_id = str(uuid.UUID(paid['id']))
         query = f"select count(*) from sales_facts where order_id='{order_id}' and quantity=2 and revenue=25"
         deadline = time.monotonic() + 90
@@ -154,7 +154,7 @@ def main():
         finally:
             lifecycle('up', '-d', '--wait', '--wait-timeout', '120', 'redis')
         api('GET', '/categories')
-        assert compose('redis', 'redis-cli', 'EXISTS', 'catalog:categories:v1') == '1'
+        assert compose('redis', 'redis-cli', 'EXISTS', 'catalog:categories:v2') == '1'
 
         try:
             lifecycle('stop', 'kafka')
@@ -187,6 +187,7 @@ def main():
     assert api('GET', '/cart', token=customer)[0]['stock'] == 0
     api('PUT', '/cart/' + pid, {'quantity': 0}, customer)
     assert api('GET', '/cart', token=customer) == []
+    api('PUT', '/admin/categories/' + category['id'], {'name': category['name'], 'active': False}, admin)
     print('PASS: admin order history, inventory audit, product archive, stale edit conflict, unavailable cart removal')
     print('Verification order:', paid['id'], '(simulated INR 25 payment; records retained, test product archived)')
 

@@ -144,10 +144,13 @@ abstract class CommerceIntegrationContract {
   void archivedProductsRemainRemovableAndStaleEditsConflict() throws Exception {
     cart(customer, 2);
     var p = json.readTree(mvc.perform(get("/api/products/" + product)).andReturn().getResponse().getContentAsString());
-    var edit = Map.of("name", "Updated headphones", "description", "Updated description", "categoryId", p.get("categoryId").asText(), "price", 1499, "active", false, "version", p.get("version").asLong());
+    var edit = Map.of("name", "Updated headphones", "description", "Updated description", "categoryId", p.get("categoryId").asText(), "price", 1499, "active", false, "version", p.get("version").asLong(), "imageUrl", "/images/products/headphones.svg");
+    var unsafe = new HashMap<String, Object>(edit);
+    unsafe.put("imageUrl", "https://untrusted.example/tracker.svg");
+    mvc.perform(put("/api/admin/products/" + product).header("Authorization", "Bearer " + admin).contentType("application/json").content(json.writeValueAsString(unsafe))).andExpect(status().isBadRequest());
     String body = json.writeValueAsString(edit);
     mvc.perform(put("/api/admin/products/" + product).header("Authorization", "Bearer " + customer).contentType("application/json").content(body)).andExpect(status().isForbidden());
-    mvc.perform(put("/api/admin/products/" + product).header("Authorization", "Bearer " + admin).contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1));
+    mvc.perform(put("/api/admin/products/" + product).header("Authorization", "Bearer " + admin).contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1)).andExpect(jsonPath("$.imageUrl").value("/images/products/headphones.svg"));
     mvc.perform(put("/api/admin/products/" + product).header("Authorization", "Bearer " + admin).contentType("application/json").content(body)).andExpect(status().isConflict());
     mvc.perform(get("/api/products/" + product)).andExpect(status().isNotFound());
     mvc.perform(get("/api/cart").header("Authorization", "Bearer " + customer)).andExpect(status().isOk()).andExpect(jsonPath("$[0].stock").value(0)).andExpect(jsonPath("$[0].price").value(1499));
@@ -250,6 +253,22 @@ abstract class CommerceIntegrationContract {
       .andExpect(jsonPath("$.summary.revenue").value(59.90));
     mvc.perform(get("/api/admin/analytics").header("Authorization", "Bearer " + admin))
       .andExpect(jsonPath("$.currency").value("INR"));
+    mvc.perform(get("/api/profile").header("Authorization", "Bearer " + customer))
+      .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("customer@example.test"))
+      .andExpect(jsonPath("$.purchases.orders").value(1));
+    mvc.perform(put("/api/profile").header("Authorization", "Bearer " + customer).contentType("application/json").content("{\"displayName\":\"Asha Rao\"}"))
+      .andExpect(status().isOk()).andExpect(jsonPath("$.displayName").value("Asha Rao"));
+    mvc.perform(get("/api/admin/customers").header("Authorization", "Bearer " + customer)).andExpect(status().isForbidden());
+    mvc.perform(get("/api/admin/customers").header("Authorization", "Bearer " + admin)).andExpect(jsonPath("$.totalElements").value(1));
+    String oid = json.readTree(first).get("id").asText();
+    mvc.perform(put("/api/admin/orders/" + oid + "/fulfillment").header("Authorization", "Bearer " + customer).contentType("application/json").content("{\"status\":\"PROCESSING\",\"version\":0}"))
+      .andExpect(status().isForbidden());
+    mvc.perform(put("/api/admin/orders/" + oid + "/fulfillment").header("Authorization", "Bearer " + admin).contentType("application/json").content("{\"status\":\"DELIVERED\",\"version\":0}"))
+      .andExpect(status().isConflict());
+    mvc.perform(put("/api/admin/orders/" + oid + "/fulfillment").header("Authorization", "Bearer " + admin).contentType("application/json").content("{\"status\":\"PROCESSING\",\"version\":0}"))
+      .andExpect(status().isOk()).andExpect(jsonPath("$.fulfillmentStatus").value("PROCESSING"));
+    mvc.perform(put("/api/admin/orders/" + oid + "/fulfillment").header("Authorization", "Bearer " + admin).contentType("application/json").content("{\"status\":\"SHIPPED\",\"version\":0}"))
+      .andExpect(status().isConflict());
     String other = register("other@example.test");
     mvc
       .perform(get("/api/orders").header("Authorization", "Bearer " + other))

@@ -39,7 +39,7 @@ extension = '.exe' if os.name == 'nt' else ''
 flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 ENV.update(DATABASE_URL='jdbc:postgresql://127.0.0.1:55432/commerce', DATABASE_USER='commerce',
            CACHE_ENABLED='false', EVENTS_ENABLED='false', ML_URL='http://127.0.0.1:8000',
-           CORS_ORIGIN='http://127.0.0.1:5173', SERVER_ADDRESS='127.0.0.1',
+           CORS_ORIGIN='http://localhost:5173,http://127.0.0.1:5173', SERVER_ADDRESS='127.0.0.1',
            PGPASSWORD=ENV['DATABASE_PASSWORD'])
 children = []
 logs = []

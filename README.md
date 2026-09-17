@@ -6,24 +6,24 @@ A full-stack portfolio project combining an INR storefront, transactional commer
 
 ## Features
 
-- Product search, category and price filters, local product illustrations, cart and order history.
+- Product search, category and price filters, local product galleries, related recommendations, cart, customer profiles and order history.
 - JWT authentication with customer/admin roles; server-priced checkout with explicitly simulated payments.
-- Admin product editing/archiving, optimistic conflict detection, inventory adjustments and audit history, order history and sales analytics.
+- Admin product editing/archiving, optimistic conflict detection, inventory adjustments and audit history, category management, customer insights, order fulfillment and sales analytics.
 - PostgreSQL transactions, Flyway migrations, ordered row locking and customer-scoped checkout idempotency.
 - Redis category caching with database fallback; Kafka transactional outbox, deduplicated projections and explicit dead-letter routing.
 - TF-IDF recommendations, random-forest demand forecasting and Isolation Forest anomaly detection. Insufficient history is reported honestly; predictions and sales are not fabricated.
 
 ## Stack and structure
 
-| Directory | Responsibility |
-| --- | --- |
-| `frontend/` | React, TypeScript, Vite, React Router, Tailwind, Axios, TanStack Query |
-| `backend/` | Java 21, Spring Boot/MVC, JPA/Hibernate, Security/JWT, Maven |
-| `ml-service/` | Python 3.13, FastAPI, Pandas, NumPy, scikit-learn |
-| `infra/aws/` | CloudFormation application/data/OIDC templates and deployment notes |
-| `scripts/` | Configuration, optional catalog seed, verification and release tooling |
-| `.github/workflows/` | Tests, Docker integration checks and manually dispatched AWS release |
-| `docs/` | Architecture, setup, verification and release guidance |
+| Directory            | Responsibility                                                         |
+| -------------------- | ---------------------------------------------------------------------- |
+| `frontend/`          | React, TypeScript, Vite, React Router, Tailwind, Axios, TanStack Query |
+| `backend/`           | Java 21, Spring Boot/MVC, JPA/Hibernate, Security/JWT, Maven           |
+| `ml-service/`        | Python 3.13, FastAPI, Pandas, NumPy, scikit-learn                      |
+| `infra/aws/`         | CloudFormation application/data/OIDC templates and deployment notes    |
+| `scripts/`           | Configuration, optional catalog seed, verification and release tooling |
+| `.github/workflows/` | Tests, Docker integration checks and manually dispatched AWS release   |
+| `docs/`              | Architecture, setup, verification and release guidance                 |
 
 ## Quick start: complete Docker stack
 
@@ -37,7 +37,7 @@ docker compose up -d --build --wait --wait-timeout 240
 
 Open [http://localhost:8088](http://localhost:8088). Sign in using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your generated local `.env`. This file is ignored by Git; never paste its contents into an issue. The generator leaves an existing `.env` unchanged. `.env.example` documents the keys; do not copy its empty values over working configuration.
 
-A fresh database has no products or orders. Add products in **Workspace → Inventory**, or optionally seed the twelve labelled demo products and a customer account:
+A fresh database has no products or orders. Add products in **Workspace → Inventory**, or optionally seed the 18 sample products across six categories and a customer account:
 
 ```sh
 python scripts/demo-data.py

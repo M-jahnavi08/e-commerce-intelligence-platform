@@ -35,3 +35,19 @@ For an already running native stack, `python scripts/verify-stack.py --base-url 
 - Insufficient ML history: expected on a new database. Do not seed invented predictions to make the screen appear populated.
 
 CI runs independent service tests, infrastructure checks, then the complete disposable Compose verification. The AWS release workflow is manual, gated by CI and the GitHub production environment. Merely committing workflow YAML does not establish that hosted CI has passed.
+
+## Verified restricted-workspace commands
+
+These commands use already installed, ignored workspace tools; a fresh clone should use the standard commands above. The local backend runner compiles application sources, runs the shared integration contract against `commerce_verification`, and includes cache/outbox/CORS/Kafka regression tests. It never truncates the application database.
+
+```powershell
+ml-service/.venv/Scripts/python.exe -X utf8 scripts/verify-backend-local.py
+python -X utf8 scripts/package-backend-local.py
+node --preserve-symlinks --preserve-symlinks-main scripts/test-frontend-local.mjs
+node --preserve-symlinks --preserve-symlinks-main frontend/node_modules/typescript/bin/tsc -b frontend/tsconfig.json
+node --preserve-symlinks --preserve-symlinks-main scripts/build-frontend-local.mjs
+python -m unittest discover -s scripts/tests -v
+python -X utf8 scripts/audit-release.py
+```
+
+Run `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` from `ml-service/`. PostgreSQL defaults to port 55432; set `TEST_DATABASE_PORT` only to the local instance hosting the disposable verification database. Packaging writes a candidate under `work/ecj-build` without replacing a running application. A `ZipFileSystemProvider`/`toRealPath` access denial from Maven is a Windows filesystem restriction, not evidence of corrupt Maven dependencies; do not delete the cache to address it.

@@ -61,7 +61,7 @@ management:
           include: livenessState
 app:
   jwt-secret: ${JWT_SECRET}
-  cors-origin: ${CORS_ORIGIN:http://localhost:5173}
+  cors-origin: ${CORS_ORIGIN:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8088,http://127.0.0.1:8088}
   events-enabled: ${EVENTS_ENABLED:false}
   cache-enabled: ${CACHE_ENABLED:false}
   ml-url: ${ML_URL:http://localhost:8000}

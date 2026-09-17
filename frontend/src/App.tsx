@@ -79,6 +79,7 @@ export default function App() {
               <>
                 <NavLink to="/cart">Cart</NavLink>
                 <NavLink to="/orders">Orders</NavLink>
+                <NavLink to="/profile">Account</NavLink>
               </>
             )}
             {session?.role === 'ADMIN' && (
@@ -98,6 +99,10 @@ export default function App() {
             <Route path="/" element={<Catalog />} />
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/profile"
+              element={session ? <Profile /> : <Navigate to="/login" replace />}
+            />
             <Route
               path="/cart"
               element={session ? <Cart /> : <Navigate to="/login" replace />}
@@ -128,23 +133,73 @@ export default function App() {
         </main>
         <footer>
           <span>Commerce Intelligence</span>
-          <span>Portfolio application · Simulated payments · INR (₹)</span>
+          <span>Thoughtful essentials · Prices in INR (₹)</span>
         </footer>
       </div>
     </Auth.Provider>
   );
 }
-function ProductImage({ src, name, className = '' }: { src?: string; name: string; className?: string }) {
-  return <img className={`product-image ${className}`} src={src || '/images/products/placeholder.svg'}
-    alt={name} loading="lazy" width={600} height={440}
-    onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.svg')) event.currentTarget.src = '/images/products/placeholder.svg'; }} />;
+function ProductImage({
+  src,
+  name,
+  className = '',
+}: {
+  src?: string;
+  name: string;
+  className?: string;
+}) {
+  return (
+    <img
+      className={`product-image ${className}`}
+      src={src || '/images/products/placeholder.svg'}
+      alt={name}
+      loading="lazy"
+      width={600}
+      height={440}
+      onError={(event) => {
+        if (!event.currentTarget.src.endsWith('/placeholder.svg'))
+          event.currentTarget.src = '/images/products/placeholder.svg';
+      }}
+    />
+  );
+}
+const productImages = [
+  'headphones',
+  'earbuds',
+  'speaker',
+  'keyboard',
+  'lamp',
+  'stand',
+  'bag',
+  'bottle',
+  'notebook',
+  'mug',
+  'throw',
+  'tray',
+  'hub',
+  'watch',
+  'shirt',
+  'sneakers',
+  'skincare',
+  'sunglasses',
+  'pouch',
+];
+function ImageOptions() {
+  return (
+    <>
+      {productImages.map((name) => (
+        <option key={name} value={`/images/products/${name}.svg`}>
+          {name[0].toUpperCase() + name.slice(1)}
+        </option>
+      ))}
+    </>
+  );
 }
 function ProductCard({ p }: { p: Product }) {
   return (
     <Link className="product-card" to={`/products/${p.id}`}>
       <div className="product-art">
         <ProductImage src={p.imageUrl} name={p.name} />
-        <small>{p.sku}</small>
       </div>
       <div className="product-meta">
         <h3>{p.name}</h3>
@@ -156,6 +211,13 @@ function ProductCard({ p }: { p: Product }) {
       </span>
     </Link>
   );
+}
+function RelatedProduct({ id }: { id: string }) {
+  const product = useQuery({
+    queryKey: ['product', id],
+    queryFn: async () => (await api.get<Product>(`/products/${id}`)).data,
+  });
+  return product.data ? <ProductCard p={product.data} /> : null;
 }
 export function Catalog() {
   const [params, setParams] = useSearchParams();
@@ -178,11 +240,11 @@ export function Catalog() {
   }
   return (
     <>
-      <section className="page-heading">
+      <section className="page-heading catalog-hero">
         <div>
           <p className="eyebrow">THE COLLECTION</p>
           <h1>Find your next essential.</h1>
-          <p>Browse the catalog. Choose with confidence.</p>
+          <p>Considered design for your desk, your home and every day.</p>
         </div>
         <span className="tag">Live inventory</span>
       </section>
@@ -280,17 +342,16 @@ export function Catalog() {
       ) : (
         <Empty>
           <h3>No products found</h3>
-          <p>
-            Try another search or category. Administrators can add products in
-            the workspace.
-          </p>
+          <p>Try a different search, category or price range.</p>
         </Empty>
       )}
     </>
   );
 }
 function ProductDetail() {
+  const [detailImage, setDetailImage] = useState(false);
   const { id } = useParams();
+  useEffect(() => setDetailImage(false), [id]);
   const { session } = useContext(Auth);
   const client = useQueryClient();
   const product = useQuery({
@@ -321,11 +382,36 @@ function ProductDetail() {
         ← Collection
       </Link>
       <div className="detail">
-        <div className="product-art large">
-          <ProductImage src={p.imageUrl} name={p.name} />
+        <div>
+          <div className="product-art large">
+            <ProductImage
+              src={
+                detailImage
+                  ? p.imageUrl?.replace('.svg', '-detail.svg')
+                  : p.imageUrl
+              }
+              name={p.name}
+            />
+          </div>
+          {p.imageUrl && !p.imageUrl.endsWith('placeholder.svg') && (
+            <div className="gallery-options" aria-label="Product image gallery">
+              <button
+                aria-pressed={!detailImage}
+                onClick={() => setDetailImage(false)}
+              >
+                Full view
+              </button>
+              <button
+                aria-pressed={detailImage}
+                onClick={() => setDetailImage(true)}
+              >
+                Detail close-up
+              </button>
+            </div>
+          )}
         </div>
         <div>
-          <p className="eyebrow">{p.sku}</p>
+          <p className="eyebrow">THE COLLECTION</p>
           <h1>{p.name}</h1>
           <p className="price">{money(p.price)}</p>
           <p>{p.description}</p>
@@ -353,7 +439,7 @@ function ProductDetail() {
       <section className="panel">
         <h2>Related products</h2>
         <p className="muted">
-          Content similarity based on product descriptions and categories.
+          Discover more pieces with similar features and style.
         </p>
         {recommendations.isPending ? (
           <Loading />
@@ -362,11 +448,9 @@ function ProductDetail() {
         ) : recommendations.data.status !== 'ready' ? (
           <p>{recommendations.data.reason}</p>
         ) : (
-          <div className="related">
+          <div className="product-grid related-products">
             {recommendations.data.recommendations.map((p) => (
-              <Link key={p.id} to={`/products/${p.id}`}>
-                {p.name}
-              </Link>
+              <RelatedProduct key={p.id} id={p.id} />
             ))}
           </div>
         )}
@@ -404,7 +488,11 @@ function Login() {
     <section className="auth panel">
       <p className="eyebrow">YOUR ACCOUNT</p>
       <h1>{register ? 'Make yourself at home.' : 'Welcome back.'}</h1>
-      <p>Sign in to manage your cart and orders.</p>
+      <p>
+        {register
+          ? 'Create an account to save your cart and track your orders.'
+          : 'Sign in to manage your cart and orders.'}
+      </p>
       <form onSubmit={submit}>
         <label>
           Email
@@ -462,6 +550,8 @@ type CartLine = {
 type Order = {
   id: string;
   status: string;
+  fulfillmentStatus: string;
+  version: number;
   total: number;
   createdAt: string;
   items: {
@@ -503,6 +593,15 @@ function Cart() {
       key.current = crypto.randomUUID();
       client.invalidateQueries({ queryKey: ['cart'] });
       client.invalidateQueries({ queryKey: ['orders'] });
+      for (const key of [
+        'profile',
+        'product',
+        'inventory',
+        'analytics',
+        'admin-orders',
+        'customers',
+      ])
+        client.invalidateQueries({ queryKey: [key] });
       client.invalidateQueries({ queryKey: ['products'] });
     },
   });
@@ -526,12 +625,28 @@ function Cart() {
               cart.data.map((l) => (
                 <div className="cart-line" key={l.productId}>
                   <div className="cart-product">
-                    <ProductImage src={l.imageUrl} name={l.name} className="thumbnail" />
+                    <ProductImage
+                      src={l.imageUrl}
+                      name={l.name}
+                      className="thumbnail"
+                    />
                     <div>
-                    <Link to={`/products/${l.productId}`}>{l.name}</Link>
-                    <p>{money(l.price)} each</p>
-                    {l.quantity > l.stock && <p role="alert">Insufficient stock or unavailable. Remove this item or reduce its quantity.</p>}
-                    <button disabled={update.isPending || checkout.isPending} onClick={() => update.mutate({ id: l.productId, quantity: 0 })}>Remove {l.name}</button>
+                      <Link to={`/products/${l.productId}`}>{l.name}</Link>
+                      <p>{money(l.price)} each</p>
+                      {l.quantity > l.stock && (
+                        <p role="alert">
+                          Insufficient stock or unavailable. Remove this item or
+                          reduce its quantity.
+                        </p>
+                      )}
+                      <button
+                        disabled={update.isPending || checkout.isPending}
+                        onClick={() =>
+                          update.mutate({ id: l.productId, quantity: 0 })
+                        }
+                      >
+                        Remove {l.name}
+                      </button>
                     </div>
                   </div>
                   <div className="quantity">
@@ -591,11 +706,14 @@ function Cart() {
                   key.current = crypto.randomUUID();
                 }}
               />
-              Test a declined payment
+              Simulate a declined payment
             </label>
             <button
               disabled={
-                !cart.data.length || cart.data.some(l => l.quantity > l.stock) || checkout.isPending || update.isPending
+                !cart.data.length ||
+                cart.data.some((l) => l.quantity > l.stock) ||
+                checkout.isPending ||
+                update.isPending
               }
               onClick={() => checkout.mutate()}
             >
@@ -612,6 +730,88 @@ function Cart() {
             ? 'Order confirmed.'
             : 'Payment declined. Your cart and inventory are unchanged.'}{' '}
           <Link to="/orders">View orders</Link>
+        </div>
+      )}
+    </>
+  );
+}
+function Profile() {
+  const client = useQueryClient();
+  const [name, setName] = useState('');
+  const profile = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () =>
+      (
+        await api.get<{
+          email: string;
+          displayName: string;
+          createdAt: string;
+          purchases: { orders: number; spent: number };
+        }>('/profile')
+      ).data,
+  });
+  useEffect(() => {
+    if (profile.data) setName(profile.data.displayName);
+  }, [profile.data]);
+  const save = useMutation({
+    mutationFn: () => api.put('/profile', { displayName: name }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['profile'] }),
+  });
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">YOUR ACCOUNT</p>
+          <h1>Personal details</h1>
+        </div>
+      </div>
+      {profile.isPending ? (
+        <Loading />
+      ) : profile.isError ? (
+        <ErrorBox error={profile.error} />
+      ) : (
+        <div className="admin-grid">
+          <section className="panel">
+            <h2>
+              Welcome
+              {profile.data.displayName ? `, ${profile.data.displayName}` : ''}
+            </h2>
+            <p>{profile.data.email}</p>
+            <p className="muted">
+              Member since{' '}
+              {new Date(profile.data.createdAt).toLocaleDateString()}
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                save.mutate();
+              }}
+            >
+              <label>
+                Display name
+                <input
+                  required
+                  maxLength={80}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <button disabled={save.isPending}>Save profile</button>
+            </form>
+            {save.isError && <ErrorBox error={save.error} />}{' '}
+            {save.isSuccess && <p role="status">Profile updated.</p>}
+          </section>
+          <section className="panel">
+            <h2>Your purchases</h2>
+            <p>
+              {profile.data.purchases.orders} successful{' '}
+              {profile.data.purchases.orders === 1 ? 'order' : 'orders'}
+            </p>
+            <strong>{money(profile.data.purchases.spent)}</strong>
+            <p>
+              <Link to="/orders">View your order history →</Link>
+            </p>
+          </section>
         </div>
       )}
     </>
@@ -643,11 +843,21 @@ function Orders() {
               <h2>{new Date(o.createdAt).toLocaleString()}</h2>
               <span className="tag">{o.status.replaceAll('_', ' ')}</span>
             </div>
-            <small>{o.id}</small>
+            <p className="muted">
+              {o.status === 'PAID'
+                ? (o.fulfillmentStatus || 'UNFULFILLED').replaceAll('_', ' ')
+                : 'Payment was not completed.'}
+            </p>
             {o.items.map((i) => (
               <p key={i.id} className="order-product">
-                <ProductImage src={i.imageUrl} name={i.productName} className="thumbnail" />
-                <span>{i.productName} × {i.quantity}</span>
+                <ProductImage
+                  src={i.imageUrl}
+                  name={i.productName}
+                  className="thumbnail"
+                />
+                <span>
+                  {i.productName} × {i.quantity}
+                </span>
                 <strong>{money(i.unitPrice * i.quantity)}</strong>
               </p>
             ))}
@@ -661,7 +871,13 @@ function Orders() {
   );
 }
 type Analytics = {
-  summary: { orders: number; revenue: number; average_order_value: number };
+  summary: {
+    orders: number;
+    revenue: number;
+    average_order_value: number;
+    customers: number;
+    repeat_customers: number;
+  };
   daily: { date: string; orders: number; revenue: number }[];
   topProducts: {
     product_id: string;
@@ -683,14 +899,83 @@ function Admin() {
   const client = useQueryClient();
   const [tab, setTab] = useState('overview');
   const [orderPage, setOrderPage] = useState(0);
+  const [customerPage, setCustomerPage] = useState(0);
+  const customers = useQuery({
+    queryKey: ['customers', customerPage],
+    queryFn: async () =>
+      (
+        await api.get<{
+          content: {
+            id: string;
+            email: string;
+            display_name: string;
+            orders: number;
+            spent: number;
+          }[];
+          totalElements: number;
+        }>(`/admin/customers?page=${customerPage}`)
+      ).data,
+    enabled: tab === 'customers',
+  });
+  const fulfill = useMutation({
+    mutationFn: ({ order, status }: { order: Order; status: string }) =>
+      api.put(`/admin/orders/${order.id}/fulfillment`, {
+        status,
+        version: order.version,
+      }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['admin-orders'] });
+      client.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
   const [auditId, setAuditId] = useState('');
+  const [categoryEdit, setCategoryEdit] = useState<
+    (Category & { active: boolean }) | null
+  >(null);
+  const adminCategories = useQuery({
+    queryKey: ['admin-categories'],
+    queryFn: async () =>
+      (await api.get<(Category & { active: boolean })[]>('/admin/categories'))
+        .data,
+    enabled: tab === 'inventory',
+  });
+  const saveCategory = useMutation({
+    mutationFn: (c: Category & { active: boolean }) =>
+      api.put(`/admin/categories/${c.id}`, c),
+    onSuccess: () => {
+      setCategoryEdit(null);
+      client.invalidateQueries({ queryKey: ['admin-categories'] });
+      client.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+
   const [auditPage, setAuditPage] = useState(0);
-  const adminOrders = useQuery({ queryKey: ['admin-orders', orderPage], queryFn: async () => (await api.get<Page<Order>>(`/admin/orders?page=${orderPage}`)).data, enabled: tab === 'orders' });
-  const audit = useQuery({ queryKey: ['inventory-audit', auditId, auditPage], queryFn: async () => (await api.get<Page<{id: string; delta: number; reason: string; createdAt: string}>>(`/admin/inventory/${auditId}/movements?page=${auditPage}`)).data, enabled: tab === 'inventory' && !!auditId });
+  const adminOrders = useQuery({
+    queryKey: ['admin-orders', orderPage],
+    queryFn: async () =>
+      (await api.get<Page<Order>>(`/admin/orders?page=${orderPage}`)).data,
+    enabled: tab === 'orders',
+  });
+  const audit = useQuery({
+    queryKey: ['inventory-audit', auditId, auditPage],
+    queryFn: async () =>
+      (
+        await api.get<
+          Page<{ id: string; delta: number; reason: string; createdAt: string }>
+        >(`/admin/inventory/${auditId}/movements?page=${auditPage}`)
+      ).data,
+    enabled: tab === 'inventory' && !!auditId,
+  });
   const [editing, setEditing] = useState<Product | null>(null);
   const saveProduct = useMutation({
     mutationFn: (p: Product) => api.put(`/admin/products/${p.id}`, p),
-    onSuccess: () => { setEditing(null); client.invalidateQueries({ queryKey: ['inventory'] }); client.invalidateQueries({ queryKey: ['products'] }); client.invalidateQueries({ queryKey: ['cart'] }); },
+    onSuccess: () => {
+      setEditing(null);
+      client.invalidateQueries({ queryKey: ['product'] });
+      client.invalidateQueries({ queryKey: ['inventory'] });
+      client.invalidateQueries({ queryKey: ['products'] });
+      client.invalidateQueries({ queryKey: ['cart'] });
+    },
   });
   const [productId, setProductId] = useState('');
   const analytics = useQuery({
@@ -724,6 +1009,9 @@ function Admin() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['inventory'] });
       client.invalidateQueries({ queryKey: ['inventory-audit'] });
+      client.invalidateQueries({ queryKey: ['product'] });
+      client.invalidateQueries({ queryKey: ['cart'] });
+      client.invalidateQueries({ queryKey: ['admin-categories'] });
       client.invalidateQueries({ queryKey: ['categories'] });
       client.invalidateQueries({ queryKey: ['products'] });
     },
@@ -756,30 +1044,164 @@ function Admin() {
         <span className="tag">Administrator</span>
       </section>
       <div className="tabs">
-        {['overview', 'inventory', 'orders', 'intelligence'].map((t) => (
-          <button
-            key={t}
-            className={tab === t ? 'active' : ''}
-            onClick={() => setTab(t)}
-          >
-            {t[0].toUpperCase() + t.slice(1)}
-          </button>
-        ))}
+        {['overview', 'inventory', 'orders', 'customers', 'intelligence'].map(
+          (t) => (
+            <button
+              key={t}
+              className={tab === t ? 'active' : ''}
+              onClick={() => setTab(t)}
+            >
+              {t[0].toUpperCase() + t.slice(1)}
+            </button>
+          ),
+        )}
       </div>
-      {tab === 'orders' && <section className="panel">
-        <h2>All orders</h2>
-        <p>Payments are simulated. Amounts are stored order snapshots in INR.</p>
-        {adminOrders.isPending ? <Loading /> : adminOrders.isError ? <ErrorBox error={adminOrders.error} /> : <>
-          {adminOrders.data.content.map(o => <article className="panel" key={o.id}>
-            <h3>Order {o.id}</h3><p>{new Date(o.createdAt).toLocaleString()} · {o.status} · {money(o.total)}</p>
-            {o.items.map(i => <div className="cart-product" key={i.id}><ProductImage src={i.imageUrl} name={i.productName} className="thumbnail" /><span>{i.productName} × {i.quantity} · {money(i.unitPrice * i.quantity)}</span></div>)}
-          </article>)}
-          {!adminOrders.data.totalElements && <Empty>No orders yet.</Empty>}
-          <button disabled={!orderPage} onClick={() => setOrderPage(p => p - 1)}>Previous orders</button>
-          <span> Page {orderPage + 1} </span>
-          <button disabled={orderPage + 1 >= adminOrders.data.totalPages} onClick={() => setOrderPage(p => p + 1)}>Next orders</button>
-        </>}
-      </section>}
+      {tab === 'orders' && (
+        <section className="panel">
+          <h2>All orders</h2>
+          {fulfill.isError && <ErrorBox error={fulfill.error} />}
+          <p>
+            Payments are simulated. Amounts are stored order snapshots in INR.
+          </p>
+          {adminOrders.isPending ? (
+            <Loading />
+          ) : adminOrders.isError ? (
+            <ErrorBox error={adminOrders.error} />
+          ) : (
+            <>
+              {adminOrders.data.content.map((o) => (
+                <article className="panel" key={o.id}>
+                  <h3>
+                    Order placed {new Date(o.createdAt).toLocaleDateString()}
+                  </h3>
+                  <p>
+                    {new Date(o.createdAt).toLocaleString()} · {o.status} ·{' '}
+                    {money(o.total)}
+                  </p>
+                  <p>
+                    Fulfillment:{' '}
+                    {(o.fulfillmentStatus || 'UNFULFILLED').replaceAll(
+                      '_',
+                      ' ',
+                    )}
+                  </p>
+                  {o.status === 'PAID' &&
+                    o.fulfillmentStatus !== 'DELIVERED' && (
+                      <button
+                        disabled={fulfill.isPending}
+                        onClick={() =>
+                          fulfill.mutate({
+                            order: o,
+                            status: (
+                              {
+                                UNFULFILLED: 'PROCESSING',
+                                PROCESSING: 'SHIPPED',
+                                SHIPPED: 'DELIVERED',
+                              } as Record<string, string>
+                            )[o.fulfillmentStatus],
+                          })
+                        }
+                      >
+                        Mark{' '}
+                        {
+                          (
+                            {
+                              UNFULFILLED: 'processing',
+                              PROCESSING: 'shipped',
+                              SHIPPED: 'delivered',
+                            } as Record<string, string>
+                          )[o.fulfillmentStatus]
+                        }
+                      </button>
+                    )}
+                  {o.items.map((i) => (
+                    <div className="cart-product" key={i.id}>
+                      <ProductImage
+                        src={i.imageUrl}
+                        name={i.productName}
+                        className="thumbnail"
+                      />
+                      <span>
+                        {i.productName} × {i.quantity} ·{' '}
+                        {money(i.unitPrice * i.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                </article>
+              ))}
+              {!adminOrders.data.totalElements && <Empty>No orders yet.</Empty>}
+              <button
+                disabled={!orderPage}
+                onClick={() => setOrderPage((p) => p - 1)}
+              >
+                Previous orders
+              </button>
+              <span> Page {orderPage + 1} </span>
+              <button
+                disabled={orderPage + 1 >= adminOrders.data.totalPages}
+                onClick={() => setOrderPage((p) => p + 1)}
+              >
+                Next orders
+              </button>
+            </>
+          )}
+        </section>
+      )}
+      {tab === 'customers' && (
+        <section className="panel">
+          <h2>Customers</h2>
+          {customers.isPending ? (
+            <Loading />
+          ) : customers.isError ? (
+            <ErrorBox error={customers.error} />
+          ) : (
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Paid orders</th>
+                      <th>Total spent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.data.content.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          {c.display_name || c.email}
+                          <br />
+                          <small>{c.display_name ? c.email : ''}</small>
+                        </td>
+                        <td>{c.orders}</td>
+                        <td>{money(c.spent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!customers.data.totalElements && (
+                <Empty>No customers yet.</Empty>
+              )}
+              <button
+                disabled={!customerPage}
+                onClick={() => setCustomerPage((p) => p - 1)}
+              >
+                Previous customers
+              </button>
+              <span> Page {customerPage + 1} </span>
+              <button
+                disabled={
+                  (customerPage + 1) * 20 >= customers.data.totalElements
+                }
+                onClick={() => setCustomerPage((p) => p + 1)}
+              >
+                Next customers
+              </button>
+            </>
+          )}
+        </section>
+      )}
       {tab === 'overview' &&
         (analytics.isPending ? (
           <Loading />
@@ -803,6 +1225,36 @@ function Admin() {
                 </strong>
               </div>
             </div>
+            <div className="metrics">
+              <div>
+                <span>Customers</span>
+                <strong>{analytics.data.summary.customers ?? 0}</strong>
+              </div>
+              <div>
+                <span>Returning buyers</span>
+                <strong>{analytics.data.summary.repeat_customers ?? 0}</strong>
+              </div>
+              <div>
+                <span>Active products</span>
+                <strong>
+                  {stock.data?.filter((p) => p.active).length ?? 0}
+                </strong>
+              </div>
+            </div>
+            <section className="panel">
+              <h2>Stock needing attention</h2>
+              {stock.data
+                ?.filter((p) => p.active && p.stock < 6)
+                .map((p) => (
+                  <p key={p.id}>
+                    {p.name} <strong>{p.stock} remaining</strong>
+                  </p>
+                ))}
+              {stock.data &&
+                !stock.data.some((p) => p.active && p.stock < 6) && (
+                  <p>All active products have healthy stock levels.</p>
+                )}
+            </section>
             <div className="admin-grid">
               <section className="panel">
                 <h2>Sales · last 30 days</h2>
@@ -867,11 +1319,41 @@ function Admin() {
                 <tbody>
                   {stock.data.map((p) => (
                     <tr key={p.id}>
-                      <td><div className="admin-product"><ProductImage src={p.imageUrl} name={p.name} className="thumbnail" /><span>{p.name}</span></div></td>
+                      <td>
+                        <div className="admin-product">
+                          <ProductImage
+                            src={p.imageUrl}
+                            name={p.name}
+                            className="thumbnail"
+                          />
+                          <span>{p.name}</span>
+                        </div>
+                      </td>
                       <td>{p.sku}</td>
                       <td>{money(p.price)}</td>
-                      <td>{p.stock} · {p.active ? 'Active' : 'Archived'}</td>
-                      <td><button aria-label={`Edit ${p.name}`} onClick={() => { saveProduct.reset(); setEditing(p); }}>Edit</button> <button aria-label={`History ${p.name}`} onClick={() => { setAuditId(p.id); setAuditPage(0); }}>History</button></td>
+                      <td>
+                        {p.stock} · {p.active ? 'Active' : 'Archived'}
+                      </td>
+                      <td>
+                        <button
+                          aria-label={`Edit ${p.name}`}
+                          onClick={() => {
+                            saveProduct.reset();
+                            setEditing(p);
+                          }}
+                        >
+                          Edit
+                        </button>{' '}
+                        <button
+                          aria-label={`History ${p.name}`}
+                          onClick={() => {
+                            setAuditId(p.id);
+                            setAuditPage(0);
+                          }}
+                        >
+                          History
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -881,29 +1363,203 @@ function Admin() {
               )}
             </div>
           )}
-          {auditId && <section className="panel">
-            <h2>Inventory history · {stock.data?.find(p => p.id === auditId)?.name}</h2>
-            {audit.isPending ? <Loading /> : audit.isError ? <ErrorBox error={audit.error} /> : <>
-              {audit.data.content.map(m => <p key={m.id}>{new Date(m.createdAt).toLocaleString()} · {m.delta > 0 ? '+' : ''}{m.delta} · {m.reason}</p>)}
-              {!audit.data.totalElements && <Empty>No inventory movements yet.</Empty>}
-              <button disabled={!auditPage} onClick={() => setAuditPage(p => p - 1)}>Previous movements</button>
-              <span> Page {auditPage + 1} </span>
-              <button disabled={auditPage + 1 >= audit.data.totalPages} onClick={() => setAuditPage(p => p + 1)}>Next movements</button>
-            </>}
-          </section>}
-          {editing && <section className="panel">
-            <h2>Edit product</h2>
-            <form onSubmit={(e) => { e.preventDefault(); saveProduct.mutate(editing); }}>
-              <label>Name<input autoFocus required maxLength={200} value={editing.name} onChange={e => setEditing({...editing, name: e.target.value})} /></label>
-              <label>Description<textarea required maxLength={4000} value={editing.description} onChange={e => setEditing({...editing, description: e.target.value})} /></label>
-              <label>Category<select value={editing.categoryId} onChange={e => setEditing({...editing, categoryId: e.target.value})}>{categories.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-              <label>Price (₹)<input type="number" required min="0" max="9999999999.99" step="0.01" value={editing.price} onChange={e => setEditing({...editing, price: Number(e.target.value)})} /></label>
-              <label><input type="checkbox" checked={editing.active} onChange={e => setEditing({...editing, active: e.target.checked})} />Available in catalog</label>
-              {saveProduct.isError && <ErrorBox error={saveProduct.error} />}
-              <button disabled={saveProduct.isPending}>Save product</button>
-              <button type="button" disabled={saveProduct.isPending} onClick={() => setEditing(null)}>Cancel</button>
-            </form>
-          </section>}
+          {auditId && (
+            <section className="panel">
+              <h2>
+                Inventory history ·{' '}
+                {stock.data?.find((p) => p.id === auditId)?.name}
+              </h2>
+              {audit.isPending ? (
+                <Loading />
+              ) : audit.isError ? (
+                <ErrorBox error={audit.error} />
+              ) : (
+                <>
+                  {audit.data.content.map((m) => (
+                    <p key={m.id}>
+                      {new Date(m.createdAt).toLocaleString()} ·{' '}
+                      {m.delta > 0 ? '+' : ''}
+                      {m.delta} · {m.reason}
+                    </p>
+                  ))}
+                  {!audit.data.totalElements && (
+                    <Empty>No inventory movements yet.</Empty>
+                  )}
+                  <button
+                    disabled={!auditPage}
+                    onClick={() => setAuditPage((p) => p - 1)}
+                  >
+                    Previous movements
+                  </button>
+                  <span> Page {auditPage + 1} </span>
+                  <button
+                    disabled={auditPage + 1 >= audit.data.totalPages}
+                    onClick={() => setAuditPage((p) => p + 1)}
+                  >
+                    Next movements
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+          {editing && (
+            <section className="panel">
+              <h2>Edit product</h2>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveProduct.mutate(editing);
+                }}
+              >
+                <label>
+                  Name
+                  <input
+                    autoFocus
+                    required
+                    maxLength={200}
+                    value={editing.name}
+                    onChange={(e) =>
+                      setEditing({ ...editing, name: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    required
+                    maxLength={4000}
+                    value={editing.description}
+                    onChange={(e) =>
+                      setEditing({ ...editing, description: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Category
+                  <select
+                    value={editing.categoryId}
+                    onChange={(e) =>
+                      setEditing({ ...editing, categoryId: e.target.value })
+                    }
+                  >
+                    {categories.data?.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Product image
+                  <select
+                    value={
+                      editing.imageUrl || '/images/products/placeholder.svg'
+                    }
+                    onChange={(e) =>
+                      setEditing({ ...editing, imageUrl: e.target.value })
+                    }
+                  >
+                    <option value="/images/products/placeholder.svg">
+                      No image selected
+                    </option>
+                    <ImageOptions />
+                  </select>
+                </label>
+                <label>
+                  Price (₹)
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    max="9999999999.99"
+                    step="0.01"
+                    value={editing.price}
+                    onChange={(e) =>
+                      setEditing({ ...editing, price: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editing.active}
+                    onChange={(e) =>
+                      setEditing({ ...editing, active: e.target.checked })
+                    }
+                  />
+                  Available in catalog
+                </label>
+                {saveProduct.isError && <ErrorBox error={saveProduct.error} />}
+                <button disabled={saveProduct.isPending}>Save product</button>
+                <button
+                  type="button"
+                  disabled={saveProduct.isPending}
+                  onClick={() => setEditing(null)}
+                >
+                  Cancel
+                </button>
+              </form>
+            </section>
+          )}
+          <section className="panel">
+            <h2>Manage categories</h2>
+            {adminCategories.isPending ? (
+              <Loading />
+            ) : adminCategories.isError ? (
+              <ErrorBox error={adminCategories.error} />
+            ) : (
+              <div className="category-list">
+                {adminCategories.data.map((c) => (
+                  <button
+                    key={c.id}
+                    className="text-button"
+                    onClick={() => setCategoryEdit(c)}
+                  >
+                    {c.name}
+                    {!c.active ? ' · Archived' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+            {categoryEdit && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveCategory.mutate(categoryEdit);
+                }}
+              >
+                <label>
+                  Category title
+                  <input
+                    required
+                    maxLength={100}
+                    value={categoryEdit.name}
+                    onChange={(e) =>
+                      setCategoryEdit({ ...categoryEdit, name: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={categoryEdit.active}
+                    onChange={(e) =>
+                      setCategoryEdit({
+                        ...categoryEdit,
+                        active: e.target.checked,
+                      })
+                    }
+                  />
+                  Show category in storefront
+                </label>
+                <button disabled={saveCategory.isPending}>Save category</button>
+                <button type="button" onClick={() => setCategoryEdit(null)}>
+                  Cancel category edit
+                </button>
+              </form>
+            )}
+            {saveCategory.isError && <ErrorBox error={saveCategory.error} />}
+          </section>
           <div className="admin-grid forms">
             <section className="panel">
               <h2>Add product</h2>
@@ -929,6 +1585,13 @@ function Admin() {
                         {c.name}
                       </option>
                     ))}
+                  </select>
+                </label>
+                <label>
+                  Product image
+                  <select name="imageUrl" required>
+                    <option value="">Choose a product image</option>
+                    <ImageOptions />
                   </select>
                 </label>
                 <div className="two-fields">

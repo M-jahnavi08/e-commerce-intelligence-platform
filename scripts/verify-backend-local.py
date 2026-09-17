@@ -43,19 +43,20 @@ def main():
     test_root = ROOT / 'backend/src/test/java/com/commerce/intelligence'
     invoke('compile-tests', ['-jar', compiler, '-21', '-parameters', '-proc:none', '-nowarn', '-classpath',
            classpath, '-d', STAGE / 'test-classes', *[test_root / name for name in
-           ['CommerceIntegrationContract.java', 'ExternalPostgresIntegrationTest.java', 'OutboxPublisherTest.java', 'CategoryCacheTest.java', 'KafkaBeanConfigurationTest.java']]])
-    with psycopg.connect(host='127.0.0.1', port=55432, user='commerce', password=env['DATABASE_PASSWORD'],
+           ['CommerceIntegrationContract.java', 'ExternalPostgresIntegrationTest.java', 'OutboxPublisherTest.java', 'CategoryCacheTest.java', 'KafkaBeanConfigurationTest.java', 'CorsRegistrationTest.java']]])
+    database_port = int(os.environ.get('TEST_DATABASE_PORT', '55432'))
+    with psycopg.connect(host='127.0.0.1', port=database_port, user='commerce', password=env['DATABASE_PASSWORD'],
                          dbname='postgres', autocommit=True, connect_timeout=5) as db:
         if not db.execute("select 1 from pg_database where datname='commerce_verification'").fetchone():
             db.execute('CREATE DATABASE commerce_verification')
-    env.update(TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:55432/commerce_verification',
+    env.update(TEST_DATABASE_URL=f'jdbc:postgresql://127.0.0.1:{database_port}/commerce_verification',
                TEST_DATABASE_USER='commerce', TEST_DATABASE_PASSWORD=env['DATABASE_PASSWORD'])
     mockito = next((ROOT / 'work/m2/org/mockito/mockito-core').rglob('*.jar'))
     invoke('run-tests', ['-Djava.net.preferIPv4Stack=true', '-Djdk.net.unixdomain.tmpdir=' + str(ROOT / 'work/local'),
            '-javaagent:' + str(mockito), '-cp', str(STAGE / 'test-classes') + os.pathsep + classpath,
            'org.junit.platform.console.ConsoleLauncher', 'execute', '--select-class',
            'com.commerce.intelligence.ExternalPostgresIntegrationTest', '--select-class',
-           'com.commerce.intelligence.OutboxPublisherTest', '--select-class', 'com.commerce.intelligence.CategoryCacheTest', '--select-class', 'com.commerce.intelligence.KafkaBeanConfigurationTest', '--details=summary', '--reports-dir', STAGE / 'reports'])
+           'com.commerce.intelligence.OutboxPublisherTest', '--select-class', 'com.commerce.intelligence.CategoryCacheTest', '--select-class', 'com.commerce.intelligence.KafkaBeanConfigurationTest', '--select-class', 'com.commerce.intelligence.CorsRegistrationTest', '--details=summary', '--reports-dir', STAGE / 'reports'])
 
 
 if __name__ == '__main__':

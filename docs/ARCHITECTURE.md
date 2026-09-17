@@ -30,7 +30,7 @@ History starts at the first recorded paid sale. Missing days in a fully queried 
 
 ## Security
 
-Public routes expose active products/categories/recommendations. Cart and order ownership derives only from a verified JWT subject. Admin routes require the signed ADMIN role. Registration always assigns CUSTOMER. Passwords use bcrypt with a UTF-8 byte limit. Credentials are environment-driven; there are no committed admin passwords. CSRF is disabled because authentication uses an explicit Bearer header, not cookies. CORS permits one configured origin.
+Public routes expose active products/categories/recommendations. Cart and order ownership derives only from a verified JWT subject. Admin routes require the signed ADMIN role. Registration always assigns CUSTOMER. Passwords use bcrypt with a UTF-8 byte limit. Credentials are environment-driven; there are no committed admin passwords. CSRF is disabled because authentication uses an explicit Bearer header, not cookies. CORS permits an explicit configured origin allowlist. Local defaults cover localhost and 127.0.0.1 on ports 5173/8088; production overrides this with its own origin. Credentialed CORS is disabled.
 
 The per-process login limiter is suitable for development only. Use WAF or shared throttling behind proxies, enforce TLS, restrict service networks and secrets access, and rotate credentials for production. Log request IDs and durations without request bodies, passwords or tokens.
 
@@ -51,3 +51,11 @@ flowchart LR
 ```
 
 Compose publishes frontend 8088 and backend 8080 on host loopback. In Fargate, all three application containers share task networking: frontend uses 8080, backend 8081, ML 8000. Data services remain private. See the AWS guide for secrets, TLS, readiness, OIDC release permissions and infrastructure prerequisites.
+
+## Profiles, catalog and fulfillment
+
+Profiles use the authenticated JWT subject and never expose password hashes. Purchase totals include only the customer's paid orders. Admin customer totals are computed from the same source records.
+
+Paid orders move through UNFULFILLED → PROCESSING → SHIPPED → DELIVERED. Updates require the current optimistic version; stale updates, skipped stages and declined orders are rejected. Payment status and historical prices remain unchanged.
+
+Products can be archived without deleting order history. Admins select bundled local images independently of SKU; the API rejects remote URLs and paths outside the image allowlist. Category visibility controls the storefront's filter list; archiving a category does not delete or archive its products. Redis category entries use the versioned `catalog:categories:v2` key and a 60-second TTL.

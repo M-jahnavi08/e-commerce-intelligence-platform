@@ -50,7 +50,9 @@ public class OrderService {
     String status,
     BigDecimal total,
     Instant createdAt,
-    List<OrderItem> items
+    List<OrderItem> items,
+    String fulfillmentStatus,
+    long version
   ) {}
 
   public OrderView view(PurchaseOrder o) {
@@ -59,7 +61,9 @@ public class OrderService {
       o.status,
       o.total,
       o.createdAt,
-      items.findByOrderIdOrderByProductId(o.id)
+      items.findByOrderIdOrderByProductId(o.id),
+      o.fulfillmentStatus,
+      o.version
     );
   }
 
@@ -163,7 +167,9 @@ public class OrderService {
       order.status,
       order.total,
       order.createdAt,
-      lines
+      lines,
+      order.fulfillmentStatus,
+      order.version
     );
   }
 }

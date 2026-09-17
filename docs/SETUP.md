@@ -63,7 +63,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (normally http://localhost:5173). Vite proxies `/api` to backend port 8080. Backend `CORS_ORIGIN` defaults to that localhost origin. Optional root formatting tools use a separate `npm ci`; they are not required to run the application.
+Open the URL printed by Vite (normally http://localhost:5173). Vite proxies `/api` to backend port 8080. Backend `CORS_ORIGIN` accepts comma-separated exact origins. Local defaults allow localhost and 127.0.0.1 on ports 5173 and 8088; Compose uses the same local allowlist. Production must set only its deployed origin(s). Optional root formatting tools use a separate `npm ci`; they are not required to run the application.
 
 ## Existing restricted Windows workspace only
 
@@ -71,6 +71,6 @@ Open the URL printed by Vite (normally http://localhost:5173). Vite proxies `/ap
 
 ## Data and images
 
-V1 creates schema; V2 converts legacy demo amounts to INR and adds product/order image paths; V3 adds history indexes. A fresh database has no historical USD data to convert. Never edit an applied migration; add a new migration. The fixed legacy conversion is demonstration data migration, not a live exchange rate.
+V1 creates schema; V2 converts legacy demo amounts to INR and adds product/order image paths; V3 adds history indexes; V4 adds customer profiles, order fulfillment/versioning and category visibility. A fresh database has no historical USD data to convert. Never edit an applied migration; add a new migration. The fixed legacy conversion is demonstration data migration, not a live exchange rate.
 
-The optional seed is additive by SKU and does not reset inventory or existing orders. Local product illustrations, including the fallback and USB-C hub, live under `frontend/public/images/products`. The public `backend/rds-ca.pem` is an AWS trust bundle, not a private key, and is required by the backend Docker image.
+The optional seed creates or updates 18 sample products by SKU, preserves inventory and orders, and archives legacy verification fixtures. It creates no sales or predictions. Local product illustrations, including the fallback and USB-C hub, live under `frontend/public/images/products`. The public `backend/rds-ca.pem` is an AWS trust bundle, not a private key, and is required by the backend Docker image.

@@ -65,7 +65,9 @@ public class SecurityConfig {
     var converter = new JwtAuthenticationConverter();
     converter.setJwtGrantedAuthoritiesConverter(roles);
     var cors = new CorsConfiguration();
-    cors.setAllowedOrigins(List.of(origin));
+    cors.setAllowedOrigins(java.util.Arrays.stream(origin.split(","))
+      .map(String::trim).filter(value -> !value.isEmpty()).toList());
+    cors.setAllowCredentials(false);
     cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     cors.setAllowedHeaders(
       List.of("Authorization", "Content-Type", "Idempotency-Key")

@@ -18,6 +18,12 @@ public class PurchaseOrder {
   @Column(length = 30)
   public String status;
 
+  @Column(length = 20)
+  public String fulfillmentStatus = "UNFULFILLED";
+
+  @Version
+  public long version;
+
   @Column(precision = 14, scale = 2)
   public BigDecimal total;
 

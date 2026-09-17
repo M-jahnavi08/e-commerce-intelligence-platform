@@ -42,13 +42,28 @@ public class CatalogService {
 
   public List<ProductView> views(List<Product> entries) {
     Map<UUID, Integer> quantities = new HashMap<>();
-    inventory.findAllById(entries.stream().map(p -> p.id).toList())
+    inventory
+      .findAllById(
+        entries
+          .stream()
+          .map(p -> p.id)
+          .toList()
+      )
       .forEach(i -> quantities.put(i.productId, i.quantity));
-    return entries.stream().map(p -> view(p, quantities.getOrDefault(p.id, 0))).toList();
+    return entries
+      .stream()
+      .map(p -> view(p, quantities.getOrDefault(p.id, 0)))
+      .toList();
   }
 
   public ProductView view(Product p) {
-    return view(p, inventory.findById(p.id).map(i -> i.quantity).orElse(0));
+    return view(
+      p,
+      inventory
+        .findById(p.id)
+        .map(i -> i.quantity)
+        .orElse(0)
+    );
   }
 
   private ProductView view(Product p, int quantity) {
@@ -112,8 +127,15 @@ public class CatalogService {
       case "price-desc" -> Sort.by("price").descending();
       default -> Sort.by("name");
     };
-    var result = products.findAll(spec, PageRequest.of(page, size, ordering.and(Sort.by("id"))));
-    return new PageImpl<>(views(result.getContent()), result.getPageable(), result.getTotalElements());
+    var result = products.findAll(
+      spec,
+      PageRequest.of(page, size, ordering.and(Sort.by("id")))
+    );
+    return new PageImpl<>(
+      views(result.getContent()),
+      result.getPageable(),
+      result.getTotalElements()
+    );
   }
 
   @Transactional(readOnly = true)
@@ -133,13 +155,21 @@ public class CatalogService {
   @Transactional
   public ProductView update(UUID id, CatalogController.UpdateProduct r) {
     Product p = products.lockById(id).orElseThrow(ApiException::missing);
-    if (p.version != r.version()) throw ApiException.conflict("Product changed. Reload before saving again.");
-    if (!categories.existsById(r.categoryId())) throw ApiException.missing();
+    if (p.version != r.version()) throw ApiException.conflict(
+      "Product changed. Reload before saving again."
+    );
+    if (
+      categories
+        .findById(r.categoryId())
+        .filter(c -> c.active)
+        .isEmpty()
+    ) throw ApiException.missing();
     p.name = r.name().trim();
     p.description = r.description().trim();
     p.categoryId = r.categoryId();
     p.price = r.price();
     p.active = r.active();
+    if (r.imageUrl() != null) p.imageUrl = validatedImage(r.imageUrl());
     products.flush();
     return view(p);
   }
@@ -151,18 +181,47 @@ public class CatalogService {
     String description,
     UUID categoryId,
     BigDecimal price,
-    int stock
+    int stock,
+    String imageUrl
   ) {
-    if (!categories.existsById(categoryId)) throw ApiException.missing();
+    if (
+      categories
+        .findById(categoryId)
+        .filter(c -> c.active)
+        .isEmpty()
+    ) throw ApiException.missing();
     Product p = new Product();
     p.id = UUID.randomUUID();
     p.sku = sku;
     String image = sku.toLowerCase(Locale.ROOT).replaceFirst("^demo-", "");
-    if (Set.of("headphones", "earbuds", "speaker", "keyboard", "lamp", "stand", "bag", "bottle", "notebook", "mug", "throw", "tray", "hub").contains(image)) {
+    if (
+      Set.of(
+        "headphones",
+        "earbuds",
+        "speaker",
+        "keyboard",
+        "lamp",
+        "stand",
+        "bag",
+        "bottle",
+        "notebook",
+        "mug",
+        "throw",
+        "tray",
+        "hub",
+        "watch",
+        "shirt",
+        "sneakers",
+        "skincare",
+        "sunglasses",
+        "pouch"
+      ).contains(image)
+    ) {
       p.imageUrl = "/images/products/" + image + ".svg";
     }
-    p.name = name;
-    p.description = description;
+    if (imageUrl != null) p.imageUrl = validatedImage(imageUrl);
+    p.name = name.trim();
+    p.description = description.trim();
     p.categoryId = categoryId;
     p.price = price;
     products.save(p);
@@ -171,5 +230,15 @@ public class CatalogService {
     i.quantity = stock;
     inventory.save(i);
     return view(p);
+  }
+
+  // Only bundled assets are accepted: no remote tracking URLs or arbitrary paths.
+  private String validatedImage(String path) {
+    if (
+      !path.matches(
+        "/images/products/(headphones|earbuds|speaker|keyboard|lamp|stand|bag|bottle|notebook|mug|throw|tray|hub|watch|shirt|sneakers|skincare|sunglasses|pouch|placeholder)\\.svg"
+      )
+    ) throw new IllegalArgumentException("Unsupported product image");
+    return path;
   }
 }

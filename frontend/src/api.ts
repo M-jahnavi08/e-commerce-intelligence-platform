@@ -26,8 +26,10 @@ export const money = (value: number) =>
 export function errorMessage(e: unknown) {
   return axios.isAxiosError(e)
     ? (e.response?.data?.detail ??
-        (e.response?.status === 401
-          ? 'Please sign in again.'
-          : 'Unable to complete the request. Please try again.'))
+        (!e.response || e.response.status === 502 || e.response.status === 503
+          ? 'The service is temporarily unavailable. Please try again shortly.'
+          : e.response?.status === 401
+            ? 'Please sign in again.'
+            : 'Unable to complete the request. Please try again.'))
     : 'Something went wrong.';
 }

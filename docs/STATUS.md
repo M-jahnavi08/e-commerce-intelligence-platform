@@ -1,22 +1,31 @@
 # Verification status
 
-Last reconciled: 2026-09-15. This replaces historical troubleshooting notes that no longer described the current code.
+Last verified: 2026-09-17.
 
-## Evidence from this development workspace
+## Passed locally
 
-- Frontend: 9 tests and TypeScript/Vite build passed during application verification.
-- ML: 27 tests passed.
-- Backend: 15 tests passed against the disposable PostgreSQL database before the two later Kafka configuration regressions were added. Those two focused tests passed separately; a combined post-fix database run is not claimed.
-- Kafka regressions reproduced duplicate bean registration and incorrect default DLT topic naming before their respective fixes, then passed. DLT transport is mocked in that focused test.
-- Latest attempted Compose script run passed HTTP authorization, catalog, checkout, idempotency, ownership, inventory, analytics and ML. It stopped when launching Docker for Redis inspection returned Windows access denied. Kafka/DLT/resilience checks were not reached in that run.
-- Three CloudFormation templates validate locally. AWS deployment and hosted GitHub Actions have not been executed from this workspace.
+- 19 backend tests, none skipped, against a dedicated PostgreSQL `commerce_verification` database. Includes concurrent checkout/stock protection, idempotency, ownership, roles, profiles, fulfillment, CORS, image validation, cache fallback, outbox and Kafka/DLT configuration regressions.
+- 10 frontend tests, TypeScript checking and Vite production build.
+- 27 ML tests and 11 infrastructure/release/catalog-asset tests.
+- Backend sources compiled with the local ECJ runner; executable Spring Boot JAR packaged and ZIP contents validated.
+- Real browser customer and admin flows against Spring Boot, PostgreSQL and FastAPI: login/register, filters, galleries, recommendations, cart, declined and paid simulated checkout, orders, profiles, product/category editing, product creation/archiving, stock adjustment/audit, customers, analytics and fulfillment. Forecast/anomaly endpoints return honest insufficient-history states.
+- Local verification fixtures were removed after a database snapshot, preserving other purchases. The optional seed provides 18 products; this existing database also retains a USB-C hub, giving 19 active products. Every active product has a locally served full/detail gallery.
+- Current release candidates exclude secrets, generated artifacts and database snapshots. Compose schema, workflow YAML and all three CloudFormation templates validate. No public deployment is claimed.
 
-## Public-release preparation checks
+## Environment limitations
 
-On 2026-09-15, 10 infrastructure/release unit tests passed. The release-candidate secret/artifact scan found no findings; Git ignore rules, required source/assets, documentation links, fresh secret generation and overwrite protection, Compose schema, workflow YAML and all three CloudFormation templates validated. Application functionality was not changed during this cleanup. This is not a Git-history or comprehensive security audit.
+Docker is not available in this session. Native frontend (5173), backend (8080), PostgreSQL (55432) and ML (8000) run successfully. Native mode deliberately disables Redis/Kafka. Their unit/contract checks pass, but real broker delivery, cache outages and the full Compose resilience suite still require a Docker-enabled machine.
 
-## External verification still required
+Standard Maven/javac fails in Windows `ZipFileSystemProvider.removeFileSystem` with `AccessDeniedException` during dependency JAR `toRealPath`. The local compilation/packaging path succeeds without changing dependencies or deleting the cache. Standard Maven and Docker builds remain configured for CI, but a successful hosted run has not been observed here.
 
-Run the complete `--compose --resilience` suite from a Docker-enabled terminal after rebuilding the current backend. Verify the corrected DLT routing on a real broker, cache outage recovery and Kafka outage recovery. Deploy only after CI passes and the AWS prerequisites, operational alarms, TLS and restore procedures are reviewed in the target account.
+## Remaining external validation
 
-The live demo will be provided after deployment. No public demo or full production certification is claimed.
+From a Docker-enabled terminal, run the complete stack and resilience suite on a disposable database:
+
+```sh
+docker compose config --quiet
+docker compose up -d --build --wait --wait-timeout 240
+python scripts/verify-stack.py --compose --resilience
+```
+
+Keep verification fixtures in disposable environments. Seed the presentation catalog with `python scripts/demo-data.py`. AWS deployment, hosted CI, TLS and operational recovery drills require the target accounts/environment. The live demo will be provided after deployment.

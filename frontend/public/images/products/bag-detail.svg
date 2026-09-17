@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="440" viewBox="0 0 600 440"><g transform="translate(-90 -66) scale(1.3)"><defs>
+ <linearGradient id="dark" x2="1" y2="1"><stop stop-color="#51676b"/><stop offset="1" stop-color="#172c32"/></linearGradient>
+ <linearGradient id="cream" x2=".4" y2="1"><stop stop-color="#fffdf7"/><stop offset="1" stop-color="#d8d8ca"/></linearGradient>
+ <linearGradient id="green" x2="1" y2=".4"><stop stop-color="#91a184"/><stop offset="1" stop-color="#405e51"/></linearGradient>
+ <linearGradient id="metal" x2=".4" y2="1"><stop stop-color="#e4e9e9"/><stop offset=".5" stop-color="#acbabe"/><stop offset="1" stop-color="#81969d"/></linearGradient>
+ <linearGradient id="tan" x2="1" y2="1"><stop stop-color="#ca9a70"/><stop offset="1" stop-color="#966440"/></linearGradient>
+ <linearGradient id="clay" x2="1"><stop stop-color="#d8b28c"/><stop offset="1" stop-color="#a27759"/></linearGradient>
+ <linearGradient id="wood" x2="1" y2="1"><stop stop-color="#e3c290"/><stop offset="1" stop-color="#b18554"/></linearGradient>
+ <pattern id="mesh" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#354e52"/><circle cx="3" cy="3" r="1.2" fill="#8da0a1"/></pattern>
+ <pattern id="woven" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#ded0b4"/><path d="M0 2h6M2 0v6" stroke="#cabb9e" stroke-width="1"/></pattern>
+ <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+ <rect width="600" height="440" fill="#e7e7da"/><circle cx="465" cy="73" r="195" fill="#ffffff" opacity=".18"/>
+ <ellipse cx="303" cy="350" rx="129" ry="16" fill="#293f3e" opacity=".15" filter="url(#shadow)"/>
+ <path d="M270 98v-9c0-35 62-35 62 0v9" fill="none" stroke="#485847" stroke-width="12"/><path d="M222 163c-40 19-38 135-13 154m177-157c33 20 30 135 11 155" fill="none" stroke="#65705b" stroke-width="19"/><rect x="213" y="101" width="175" height="232" rx="52" fill="url(#green)"/><path d="M230 171h140" stroke="#bdc2a6" stroke-width="3"/><rect x="233" y="214" width="134" height="96" rx="18" fill="#66765c" stroke="#a7af90"/><path d="M248 233h103" stroke="#303f36" stroke-width="3"/><rect x="290" y="186" width="25" height="11" rx="2" fill="#d8b78d"/><path d="M364 174v16" stroke="#d6cbaa" stroke-width="5"/><text x="300" y="398" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" letter-spacing="3" fill="#5f716d">COMMUTE / EVERYDAY</text></g></svg>

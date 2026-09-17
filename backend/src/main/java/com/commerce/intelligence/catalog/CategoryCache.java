@@ -32,20 +32,20 @@ public class CategoryCache {
 
   public List<Category> get() {
     if (enabled) try {
-      String cached = redis.opsForValue().get("catalog:categories:v1");
+      String cached = redis.opsForValue().get("catalog:categories:v2");
       if (cached != null) return json.readValue(
         cached,
         new TypeReference<List<Category>>() {}
-      );
+      ).stream().filter(c -> c.active).toList();
     } catch (Exception ignored) {}
     var result = categories.findAll(
       org.springframework.data.domain.Sort.by("name")
-    );
+    ).stream().filter(c -> c.active).toList();
     if (enabled) try {
       redis
         .opsForValue()
         .set(
-          "catalog:categories:v1",
+          "catalog:categories:v2",
           json.writeValueAsString(result),
           Duration.ofSeconds(60)
         );
@@ -55,7 +55,7 @@ public class CategoryCache {
 
   public void invalidate() {
     if (enabled) try {
-      redis.delete("catalog:categories:v1");
+      redis.delete("catalog:categories:v2");
     } catch (Exception ignored) {}
   }
 }

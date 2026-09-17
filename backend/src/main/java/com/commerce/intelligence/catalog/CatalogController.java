@@ -64,6 +64,26 @@ public class CatalogController {
     return saved;
   }
 
+  public record UpdateCategory(
+    @NotBlank @Size(max = 100) String name,
+    @NotNull Boolean active
+  ) {}
+
+  @PutMapping("/admin/categories/{id}")
+  public Category updateCategory(
+    @PathVariable UUID id,
+    @Valid @RequestBody UpdateCategory r
+  ) {
+    Category c = categories
+      .findById(id)
+      .orElseThrow(com.commerce.intelligence.api.ApiException::missing);
+    c.name = r.name().trim();
+    c.active = r.active();
+    Category saved = categories.save(c);
+    cache.invalidate();
+    return saved;
+  }
+
   public record CreateProduct(
     @NotBlank @Size(max = 64) String sku,
     @NotBlank @Size(max = 200) String name,
@@ -73,20 +93,28 @@ public class CatalogController {
     @DecimalMin("0.00")
     @Digits(integer = 10, fraction = 2)
     BigDecimal price,
-    @Min(0) int stock
+    @Min(0) int stock,
+    @Size(max = 300) String imageUrl
   ) {}
 
   public record UpdateProduct(
     @NotBlank @Size(max = 200) String name,
     @NotBlank @Size(max = 4000) String description,
     @NotNull UUID categoryId,
-    @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal price,
+    @NotNull
+    @DecimalMin("0.00")
+    @Digits(integer = 10, fraction = 2)
+    BigDecimal price,
     @NotNull Boolean active,
-    @NotNull @Min(0) Long version
+    @NotNull @Min(0) Long version,
+    @Size(max = 300) String imageUrl
   ) {}
 
   @PutMapping("/admin/products/{id}")
-  public CatalogService.ProductView update(@PathVariable UUID id, @Valid @RequestBody UpdateProduct r) {
+  public CatalogService.ProductView update(
+    @PathVariable UUID id,
+    @Valid @RequestBody UpdateProduct r
+  ) {
     return service.update(id, r);
   }
 
@@ -101,7 +129,8 @@ public class CatalogController {
       r.description(),
       r.categoryId(),
       r.price(),
-      r.stock()
+      r.stock(),
+      r.imageUrl()
     );
   }
 }
